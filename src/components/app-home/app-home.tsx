@@ -206,6 +206,8 @@ export class AppHome {
             Clear
           </ion-button>
         </div>
+
+        <p>v0.0.1</p>
       </ion-content>,
     ]
   }
