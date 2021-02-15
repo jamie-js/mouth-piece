@@ -1,0 +1,28 @@
+{
+  "name": "mouth-piece",
+  "private": true,
+  "version": "0.0.1",
+  "description": "mouth-piece",
+  "license": "MIT",
+  "files": [
+    "dist/"
+  ],
+  "scripts": {
+    "build": "stencil build",
+    "start": "stencil build --dev --watch --serve",
+    "test": "stencil test --spec --e2e",
+    "test.watch": "stencil test --spec --e2e --watch",
+    "generate": "stencil generate",
+    "deploy" : "firebase deploy --only hosting"
+  },
+  "devDependencies": {
+    "@ionic/core": "^5.3.2",
+    "@stencil/core": "2.4.0"
+  },
+  "dependencies": {
+    "@capacitor/cli": "^2.4.6",
+    "@capacitor/core": "^2.4.6",
+    "@ionic-native/media": "^5.31.1",
+    "@types/dom-mediacapture-record": "^1.0.7"
+  }
+}

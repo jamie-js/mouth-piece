@@ -1,0 +1,13 @@
+{
+  "appId": "com.app.mouthpiece",
+  "appName": "mouth-piece",
+  "bundledWebRuntime": false,
+  "npmClient": "npm",
+  "webDir": "www",
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 0
+    }
+  },
+  "cordova": {}
+}
