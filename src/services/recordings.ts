@@ -3,11 +3,10 @@ import { get, set } from './storage'
 export interface Recording {
   id: number
   name?: string
-  location?: string
-  icon?: string
   data: string
-  url: string
   progress: number
+  isSynth?: boolean
+  duration?: number
 }
 
 class RecordingsController {
