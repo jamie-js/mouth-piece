@@ -7,46 +7,31 @@ import { Recording, Recordings } from '../../services/recordings'
 })
 export class AppAddRecording {
   @State() btnRecorderName: string = 'Record Voice'
+  @State() btnRecorderColour: string = 'white'
 
   name: string = ''
-  location: string
-  icon: string
   recorder
   gumStream
-  recordingUrl: string
   data: string
   blobData: Blob
-  // extension: string
-
-  // componentDidLoad() {
-  //   const recorder = document.getElementById('recorder') as HTMLInputElement
-  //   const player = document.getElementById('player') as HTMLAudioElement
-
-  //   recorder.addEventListener('change', function (e: Event) {
-  //     console.log('event change')
-  //     const file = (e.target as HTMLInputElement).files[0]
-  //     const url = URL.createObjectURL(file)
-  //     // // Do something with the audio file.
-  //     player.src = url
-  //   })
-
-  //   if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
-  //     this.extension = 'webm'
-  //   } else {
-  //     this.extension = 'ogg'
-  //   }
-  // }
+  timer = 0
 
   toggleRecording() {
     const player = document.getElementById('player') as HTMLAudioElement
     if (this.recorder && this.recorder.state == 'recording') {
       console.log('Stop')
       this.btnRecorderName = 'Record Voice'
+      this.btnRecorderColour = 'white'
       this.recorder.stop()
+      this.timer = Date.now() - this.timer
+      //convert to seconds
+      // this.timer = this.timer / 1000
+
       this.gumStream.getAudioTracks()[0].stop()
     } else {
       console.log('record')
       this.btnRecorderName = 'Recording...'
+      this.btnRecorderColour = 'red'
       navigator.mediaDevices
         .getUserMedia({
           audio: true,
@@ -56,11 +41,12 @@ export class AppAddRecording {
           this.recorder = new MediaRecorder(stream)
           this.recorder.ondataavailable = e => {
             this.blobData = e.data
-            this.recordingUrl = URL.createObjectURL(e.data)
-            player.src = this.recordingUrl
+            console.log(e.data)
+            player.src = URL.createObjectURL(e.data)
           }
 
           this.recorder.start()
+          this.timer = Date.now()
         })
     }
   }
@@ -82,11 +68,9 @@ export class AppAddRecording {
     let recording: Recording = {
       id: Date.now(),
       name: this.name,
-      location: this.location,
-      icon: this.icon,
       data: this.data,
-      url: this.recordingUrl,
       progress: 100,
+      duration: this.timer,
     }
 
     console.log(recording.name)
@@ -111,11 +95,6 @@ export class AppAddRecording {
         this.name = value
         break
       }
-
-      case 'icon': {
-        this.icon = value
-        break
-      }
     }
   }
 
@@ -131,22 +110,37 @@ export class AppAddRecording {
       </ion-header>,
 
       <ion-content>
-        <p>Instructions</p>
-        <ion-list>
-          <ion-item>
-            <ion-label position="stacked">Name</ion-label>
-            <ion-input name="name" onInput={e => this.changeValue(e)} placeholder="e.g. My angelic voice note" type="text"></ion-input>
-          </ion-item>
-        </ion-list>
-        <ion-button expand="full" onClick={() => this.toggleRecording()}>
-          {this.btnRecorderName}
-        </ion-button>
-
-        <ion-button expand="full" onClick={() => this.createRecordingFile()}>
-          Add New Recording
-        </ion-button>
-
-        <audio id="player" controls></audio>
+        <ion-grid>
+          <ion-row class="ion-justify-content-center ion-align-items-center">
+            <h3>Add a new recording to your collection</h3>
+          </ion-row>
+          <ion-row>
+            <ion-col>
+              <ion-item>
+                <ion-label position="stacked">Name</ion-label>
+                <ion-input name="name" onInput={e => this.changeValue(e)} placeholder="e.g. My angelic voice note" type="text"></ion-input>
+              </ion-item>
+            </ion-col>
+          </ion-row>
+          <ion-row class="ion-justify-content-center ion-align-items-center">
+            <ion-col>
+              <ion-button expand="full" onClick={() => this.toggleRecording()}>
+                <ion-icon style={{ color: this.btnRecorderColour }} slot="start" name="mic-outline"></ion-icon>
+                {this.btnRecorderName}
+              </ion-button>
+            </ion-col>
+            <ion-col>
+              <audio id="player" controls></audio>
+            </ion-col>
+          </ion-row>
+          <ion-row class="ion-justify-content-center ion-align-items-center">
+            <ion-col>
+              <ion-button expand="full" onClick={() => this.createRecordingFile()}>
+                Add New Recording
+              </ion-button>
+            </ion-col>
+          </ion-row>
+        </ion-grid>
       </ion-content>,
     ]
   }
