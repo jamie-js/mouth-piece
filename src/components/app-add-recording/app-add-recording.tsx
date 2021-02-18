@@ -1,4 +1,4 @@
-import { Component, h, Listen, State } from '@stencil/core'
+import { Component, h, State } from '@stencil/core'
 import { Recording, Recordings } from '../../services/recordings'
 import { SynthSpeech } from '../../services/synthSpeech'
 import { Helper } from '../../services/helper'
@@ -25,8 +25,6 @@ export class AppAddRecording {
   isSynth: boolean = false
 
   recordVoice() {
-    // const player = document.getElementById('player') as HTMLAudioElement
-
     if (this.recorder && this.recorder.state == 'recording') {
       this.btnRecorderName = 'Record Voice'
       this.btnRecorderColour = 'white'

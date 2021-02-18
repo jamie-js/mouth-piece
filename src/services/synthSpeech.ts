@@ -1,5 +1,3 @@
-// import { Event, EventEmitter } from '@stencil/core'
-
 class SynthSpeechController {
   timer = 0
   private synth = window.speechSynthesis
