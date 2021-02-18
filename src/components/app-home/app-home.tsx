@@ -1,5 +1,7 @@
 import { Component, h, State } from '@stencil/core'
 import { Recording, Recordings } from '../../services/recordings'
+import { SynthSpeech } from '../../services/synthSpeech'
+import { Helper } from '../../services/helper'
 
 @Component({
   tag: 'app-home',
@@ -9,14 +11,9 @@ export class AppHome {
   @State() recordings: Recording[] = []
   @State() progress: number = 100
   @State() text: string
-  @State() canSave: boolean = false
 
-  // text: string
   audio: HTMLAudioElement
   animateLabelInterval: any
-  // duration = 0
-  synth = window.speechSynthesis
-  timer = 0
 
   componentDidLoad() {
     const router = document.querySelector('ion-router')
@@ -26,27 +23,64 @@ export class AppHome {
       const recordings = await Recordings.getRecordings()
       this.recordings = [...recordings]
     })
+
+    //listen for synth to finish talking
+    window.addEventListener('synthCompleted', (e: CustomEvent) => {
+      this.synthCompleted(e.detail)
+    })
   }
 
-  async deleteRecording(recording) {
-    const list = document.querySelector('ion-list')
+  //#region playback
+  onClickRecording(recording) {
+    if (this.audio) {
+      // console.log('audio playing')
+      this.stopAudio(recording)
+    }
 
-    console.log('delete recording')
-    console.log(recording)
-    await Recordings.removeRecording(recording)
-    const recordings = await Recordings.getRecordings()
-    this.recordings = [...recordings]
+    if (SynthSpeech.isSpeaking()) {
+      // console.log('synth talking')
+      this.stopSynth(recording)
+    }
 
-    list.closeSlidingItems()
+    if (recording.isSynth) {
+      this.playSynth(recording)
+    } else {
+      this.playAudio(recording)
+    }
+  }
+
+  playSynth(recording) {
+    // this.speak(recording.data, recording)
+    SynthSpeech.play(recording.data, recording)
+    this.progress = 100
+    recording.progress = this.progress
+    this.animateLabel(recording)
+  }
+
+  playAudio(recording) {
+    let blob = Helper.dataURItoBlob(recording.data)
+    let url = URL.createObjectURL(blob)
+    this.audio = new Audio(url)
+
+    this.audio.onended = () => {
+      this.stopAudio(recording)
+    }
+
+    this.audio.oncanplay = () => {
+      if (this.audio) {
+        this.audio.play()
+        this.progress = 100
+        recording.progress = this.progress
+        this.animateLabel(recording)
+      }
+    }
   }
 
   stopSynth(recording) {
+    SynthSpeech.stop()
     this.progress = 100
-    if (recording) {
-      recording.progress = this.progress
-      clearInterval(this.animateLabelInterval)
-    }
-    this.canSave = true
+    recording.progress = this.progress
+    clearInterval(this.animateLabelInterval)
   }
 
   stopAudio(recording) {
@@ -59,53 +93,14 @@ export class AppHome {
 
     clearInterval(this.animateLabelInterval)
   }
+  //#endregion playback
 
-  playSynth(recording) {
-    this.speak(recording.data, recording)
-    this.progress = 100
-    recording.progress = this.progress
-    this.animateLabel(recording)
-  }
-
-  playAudio(recording) {
-    let blob = this.dataURItoBlob(recording.data)
-    let url = URL.createObjectURL(blob)
-    this.audio = new Audio(url)
-
-    this.audio.onended = () => {
-      console.log('sound ended')
-      this.stopAudio(recording)
-    }
-
-    this.audio.oncanplay = () => {
-      if (this.audio) {
-        console.log('sound play')
-        this.audio.play()
-        this.progress = 100
-        recording.progress = this.progress
-        this.animateLabel(recording)
-      }
-    }
-
-    // if (!recording.duration) {
-    //   this.audio.ondurationchange = () => {
-    //     if (this.audio.duration != Infinity) {
-    //       recording.duration = this.audio.duration
-    //       const recordings = await Recordings.getRecordings()
-    //       this.recordings = [...recordings]
-    //     }
-    //   }
-    // }
-  }
-
+  //#region events
   animateLabel(recording) {
-    console.log(recording)
-
     if (this.audio) {
       //playing audio
       let duration = recording.duration / 1000
       this.animateLabelInterval = setInterval(() => {
-        console.log(this.audio.currentTime)
         let percentage = this.audio.currentTime / duration
 
         this.progress = 100 - Math.floor(percentage * 100)
@@ -115,84 +110,13 @@ export class AppHome {
     } else {
       //playing synth
       let start = Date.now()
-      console.log(Date.now())
-      console.log(recording.duration + start)
 
       this.animateLabelInterval = setInterval(() => {
         let percentage = (Date.now() - start) / recording.duration
-        console.log(percentage)
         this.progress = 100 - Math.floor(percentage * 100)
 
         recording.progress = this.progress
       }, 50)
-    }
-  }
-
-  onClickRecording(recording) {
-    if (this.audio) {
-      this.stopAudio(recording)
-    } else if (this.synth.speaking) {
-      this.stopSynth(recording)
-    } else {
-      if (recording.isSynth) {
-        this.playSynth(recording)
-      } else {
-        this.playAudio(recording)
-      }
-    }
-  }
-
-  onTextToSpeech() {
-    this.speak(this.text, null)
-  }
-
-  async onSaveText() {
-    let recording: Recording = {
-      id: Date.now(),
-      name: this.text,
-      data: this.text,
-      isSynth: true,
-      progress: 100,
-      duration: this.timer,
-    }
-
-    if (recording.name === '') {
-      recording.name = recording.id.toString()
-    }
-    console.log(recording)
-
-    //wait for the new recording info to be added
-    await Recordings.addRecording(recording)
-    const recordings = await Recordings.getRecordings()
-    this.recordings = [...recordings]
-
-    this.canSave = false
-    this.text = ''
-  }
-
-  speak(text, recording) {
-    if (this.synth.speaking) {
-      console.error('speechSynthesis.speaking')
-      return
-    }
-    if (text !== '') {
-      var utterThis = new SpeechSynthesisUtterance(text)
-      utterThis.onend = () => {
-        console.log('SpeechSynthesisUtterance.onend')
-      }
-      utterThis.onerror = () => {
-        console.error('SpeechSynthesisUtterance.onerror')
-      }
-
-      utterThis.onend = () => {
-        this.timer = Date.now() - this.timer
-        this.stopSynth(recording)
-
-        //convert to seconds
-        // this.timer = this.timer / 1000
-      }
-      this.timer = Date.now()
-      this.synth.speak(utterThis)
     }
   }
 
@@ -201,31 +125,27 @@ export class AppHome {
 
     switch (ev.target.name) {
       case 'text': {
-        this.canSave = false
-
         this.text = value
         break
       }
     }
   }
 
-  dataURItoBlob(dataURI) {
-    // convert base64 to raw binary data held in a string
-    var byteString = atob(dataURI.split(',')[1])
+  synthCompleted(recording: Recording) {
+    this.stopSynth(recording)
+  }
 
-    // separate out the mime component
-    var mimeString = dataURI.split(',')[0].split(':')[1].split(';')[0]
+  async deleteRecording(recording) {
+    const list = document.querySelector('ion-list')
+    await Recordings.removeRecording(recording)
+    const recordings = await Recordings.getRecordings()
+    this.recordings = [...recordings]
+    list.closeSlidingItems()
+  }
+  //#endregion events
 
-    // write the bytes of the string to an ArrayBuffer
-    var arrayBuffer = new ArrayBuffer(byteString.length)
-    var _ia = new Uint8Array(arrayBuffer)
-    for (var i = 0; i < byteString.length; i++) {
-      _ia[i] = byteString.charCodeAt(i)
-    }
-
-    var dataView = new DataView(arrayBuffer)
-    var blob = new Blob([dataView], { type: mimeString })
-    return blob
+  onTextToSpeech() {
+    SynthSpeech.play(this.text, null)
   }
 
   renderWelcomeMessage() {
@@ -282,13 +202,13 @@ export class AppHome {
           <ion-button size="large" expand="full" onClick={() => this.onTextToSpeech()}>
             Play
           </ion-button>
-          <ion-button disabled={!this.canSave} size="large" expand="full" onClick={() => this.onSaveText()}>
+          {/* <ion-button disabled={!this.canSave} size="large" expand="full" onClick={() => this.onSaveText()}>
             Save
-          </ion-button>
+          </ion-button> */}
           <ion-button size="large" expand="full" onClick={() => (this.text = '')}>
             Clear
           </ion-button>
-          <p class="version-text">v0.0.4</p>
+          <p class="version-text">v0.0.5</p>
         </div>
       </ion-content>,
     ]

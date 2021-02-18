@@ -1,5 +1,7 @@
-import { Component, h, State } from '@stencil/core'
+import { Component, h, Listen, State } from '@stencil/core'
 import { Recording, Recordings } from '../../services/recordings'
+import { SynthSpeech } from '../../services/synthSpeech'
+import { Helper } from '../../services/helper'
 
 @Component({
   tag: 'app-add-recording',
@@ -8,28 +10,31 @@ import { Recording, Recordings } from '../../services/recordings'
 export class AppAddRecording {
   @State() btnRecorderName: string = 'Record Voice'
   @State() btnRecorderColour: string = 'white'
+  @State() btnSynthRecorderName: string = 'Record Synth'
+  @State() btnSynthRecorderColour: string = 'white'
 
-  name: string = ''
+  @State() text: string
+  @State() data: string = ''
+  @State() name: string = ''
+
   recorder
   gumStream
-  data: string
-  blobData: Blob
-  timer = 0
+  audio: HTMLAudioElement
 
-  toggleRecording() {
-    const player = document.getElementById('player') as HTMLAudioElement
+  timer: number = 0
+  isSynth: boolean = false
+
+  recordVoice() {
+    // const player = document.getElementById('player') as HTMLAudioElement
+
     if (this.recorder && this.recorder.state == 'recording') {
-      console.log('Stop')
       this.btnRecorderName = 'Record Voice'
       this.btnRecorderColour = 'white'
       this.recorder.stop()
       this.timer = Date.now() - this.timer
-      //convert to seconds
-      // this.timer = this.timer / 1000
-
       this.gumStream.getAudioTracks()[0].stop()
     } else {
-      console.log('record')
+      this.isSynth = false
       this.btnRecorderName = 'Recording...'
       this.btnRecorderColour = 'red'
       navigator.mediaDevices
@@ -40,9 +45,7 @@ export class AppAddRecording {
           this.gumStream = stream
           this.recorder = new MediaRecorder(stream)
           this.recorder.ondataavailable = e => {
-            this.blobData = e.data
-            console.log(e.data)
-            player.src = URL.createObjectURL(e.data)
+            this.createRecordingFile(e.data)
           }
 
           this.recorder.start()
@@ -51,17 +54,46 @@ export class AppAddRecording {
     }
   }
 
-  createRecordingFile() {
+  recordSynth() {
+    this.btnSynthRecorderName = 'Recording...'
+    this.btnSynthRecorderColour = 'red'
+
+    SynthSpeech.play(this.text, null).then(duration => {
+      this.timer = Number(duration)
+      this.isSynth = true
+      this.data = this.text
+      this.btnSynthRecorderColour = 'white'
+      this.btnSynthRecorderName = 'Record Synth'
+    })
+  }
+
+  playRecording() {
+    if (this.isSynth) {
+      SynthSpeech.play(this.data, null)
+    } else {
+      this.playAudio()
+    }
+  }
+
+  playAudio() {
+    let blob = Helper.dataURItoBlob(this.data)
+    let url = URL.createObjectURL(blob)
+    this.audio = new Audio(url)
+
+    this.audio.oncanplay = () => {
+      if (this.audio) {
+        this.audio.play()
+      }
+    }
+  }
+
+  createRecordingFile(data: Blob) {
     const reader = new FileReader()
     reader.onload = event => {
-      // console.log(event)
-      // console.log(event.target)
-      // console.log(event.target.result)
       this.data = event.target.result.toString()
-      this.addRecording()
-      // localStorage.setItem("file", event.target.result);
+      // this.addRecording()
     }
-    reader.readAsDataURL(this.blobData)
+    reader.readAsDataURL(data)
   }
 
   async addRecording() {
@@ -71,9 +103,9 @@ export class AppAddRecording {
       data: this.data,
       progress: 100,
       duration: this.timer,
+      isSynth: this.isSynth,
     }
 
-    console.log(recording.name)
     if (recording.name === '') {
       recording.name = recording.id.toString()
     }
@@ -81,7 +113,6 @@ export class AppAddRecording {
     //wait for the new recording info to be added
     await Recordings.addRecording(recording)
 
-    console.log('recording added')
     //return to the home screen
     const navCtrl = document.querySelector('ion-router')
     navCtrl.back()
@@ -93,6 +124,18 @@ export class AppAddRecording {
     switch (e.target.name) {
       case 'name': {
         this.name = value
+        break
+      }
+      case 'text': {
+        this.text = value
+        break
+      }
+      case 'timer': {
+        this.timer = value
+        break
+      }
+      case 'data': {
+        this.data = value
         break
       }
     }
@@ -112,30 +155,60 @@ export class AppAddRecording {
       <ion-content>
         <ion-grid>
           <ion-row class="ion-justify-content-center ion-align-items-center">
-            <h3>Add a new recording to your collection</h3>
+            <h2>Add a new recording to your collection</h2>
           </ion-row>
           <ion-row>
             <ion-col>
               <ion-item>
-                <ion-label position="stacked">Name</ion-label>
+                <ion-label position="stacked">Title</ion-label>
                 <ion-input name="name" onInput={e => this.changeValue(e)} placeholder="e.g. My angelic voice note" type="text"></ion-input>
               </ion-item>
             </ion-col>
           </ion-row>
-          <ion-row class="ion-justify-content-center ion-align-items-center">
-            <ion-col>
-              <ion-button expand="full" onClick={() => this.toggleRecording()}>
+          <ion-row color="red" class="ion-justify-content-center ion-align-items-center">
+            <ion-col size="12">
+              <h3>Record Your Voice</h3>
+            </ion-col>
+            <ion-col size="12">
+              <ion-button style={{ color: this.btnSynthRecorderColour }} size="large" expand="full" onClick={() => this.recordVoice()}>
                 <ion-icon style={{ color: this.btnRecorderColour }} slot="start" name="mic-outline"></ion-icon>
                 {this.btnRecorderName}
               </ion-button>
             </ion-col>
-            <ion-col>
-              <audio id="player" controls></audio>
+          </ion-row>
+
+          <ion-row>
+            <ion-col size="12">
+              <h3>Record Synth Voice</h3>
+            </ion-col>
+            <ion-col size="12">
+              <ion-item>
+                <ion-label position="stacked">Enter Text</ion-label>
+                <ion-input name="text" value={this.text} onInput={ev => this.changeValue(ev)} placeholder="What to say..." type="text"></ion-input>
+              </ion-item>
+            </ion-col>
+            <ion-col size="12">
+              <ion-button style={{ color: this.btnSynthRecorderColour }} onClick={() => this.recordSynth()} size="large" expand="full">
+                <ion-icon style={{ color: this.btnSynthRecorderColour }} slot="start" name="invert-mode-outline"></ion-icon>
+                {this.btnSynthRecorderName}
+              </ion-button>
             </ion-col>
           </ion-row>
+
+          <ion-row>
+            <ion-col>
+              <h3>Playback Recording</h3>
+            </ion-col>
+            <ion-col size="12">
+              <ion-button disabled={this.data === ''} size="large" expand="full" onClick={() => this.playRecording()}>
+                Play Recording
+              </ion-button>
+            </ion-col>
+          </ion-row>
+
           <ion-row class="ion-justify-content-center ion-align-items-center">
             <ion-col>
-              <ion-button expand="full" onClick={() => this.createRecordingFile()}>
+              <ion-button disabled={this.data === '' || this.name === ''} size="large" expand="full" onClick={() => this.addRecording()}>
                 Add New Recording
               </ion-button>
             </ion-col>
